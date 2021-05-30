@@ -3,8 +3,9 @@ import * as admin from "firebase-admin";
 import * as express from "express";
 import * as cors from "cors";
 import * as dialogflowcx from "@google-cloud/dialogflow-cx";
-import * as swaggerJsdoc from "swagger-jsdoc";
-import * as swaggerUi from "swagger-ui-express";
+// import * as swaggerJsdoc from "swagger-jsdoc";
+// import * as swaggerUi from "swagger-ui-express";
+import { google } from "@google-cloud/dialogflow-cx/build/protos/protos";
 
 const app = express();
 app.use(express.json());
@@ -54,19 +55,6 @@ app.post("/agents", async (req, res) => {
   }
 
   // Check if agent name is already in the database
-  try {
-    const newAgent = await db.collection("users")
-        .doc(email).collection("agents")
-        .doc(displayName).get();
-
-    if (newAgent.exists) {
-      // Change status to error X
-      res.status(400).send({error: "Agent with the same name already created"});
-      return;
-    }
-  } catch (err) {
-    res.send(err);
-  }
 
   const agent = req.body.agent;
   console.log(agent);
@@ -98,6 +86,128 @@ app.post("/agents", async (req, res) => {
   }
 });
 
+app.put("/agents/:agentName", async (req, res) => {
+  const client = new dialogflowcx.v3.AgentsClient(
+      {keyFilename: "./flowBuilder.json"}
+  );
+
+  // Gets email from credentials body json
+  // const email = req.body.credentials.email;
+
+  const displayName = req.params.agentName;
+
+  if (displayName === "") {
+    res.status(400).send({error: `${displayName} can not be empty`});
+    return;
+  }
+
+  // check if email exists in the db
+
+  // check if an agent with that name exists in the db
+
+  const agentID = client.agentPath(project, "global", "1ad38af8-08ab-4b3f-82b1-76c395d1def9");
+
+  // get requested agent
+  try {
+    const [IAgent] = await client.getAgent({
+      name: agentID,
+    });
+
+    IAgent.displayName = "Name Changed";
+
+    // update client with data passed to it
+    const update = await client.updateAgent({
+      agent: IAgent, // agent to update
+    });
+    res.send(update);
+  } catch (err) {
+    console.error(err);
+    res.send(err);
+  } 
+});
+
+app.post("/agents/:agentName/flows", async (req, res) => {
+  const client = new dialogflowcx.v3.FlowsClient(
+      {keyFilename: "./flowBuilder.json"}
+  );
+
+  // Gets email from credentials body json
+  // const email = req.body.credentials.email;
+
+  const displayName = req.params.agentName;
+
+  if (displayName === "") {
+    res.status(400).send({error: `${displayName} can not be empty`});
+    return;
+  }
+
+  // check if email exists in the db
+
+  // check if an agent with that name exists in the db
+
+  const agentPath = client.agentPath(project, "global", "1ad38af8-08ab-4b3f-82b1-76c395d1def9");
+
+  // create flow
+  try {
+  const newFlow = await client.createFlow({
+    parent: agentPath,
+    flow: req.body.flow
+    // language code
+  });
+
+  //store it in db
+
+
+  res.send(newFlow)
+  } catch (err) {
+    console.error(err);
+    res.send(err);    
+  }
+});
+
+
+app.put("/agents/:agentName/flows/:flowName", async (req, res) => {
+  const client = new dialogflowcx.v3.FlowsClient(
+      {keyFilename: "./flowBuilder.json"}
+  );
+
+  // Gets email from credentials body json
+  // const email = req.body.credentials.email;
+
+  const agentName = req.params.agentName;
+  const flowName = req.params.flowName
+
+  if (agentName === "") {
+    res.status(400).send({error: `${agentName} can not be empty`});
+    return;
+  }
+
+  // check if email exists in the db
+
+  // check if an agent with that name exists in the db
+
+  // const agentID = client.agentPath(project, "global", agentName);
+
+  
+
+  // get requested agent
+  try {
+    const [IFlow] = await client.getFlow({
+      name: flowName
+    });
+
+    // change what needs to be changed in the flow
+
+    const update = await client.updateFlow({
+      flow: IFlow,
+      // language code
+    });
+    res.send(update);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
 /*
  Creates a page for the given agent
 */
@@ -106,25 +216,15 @@ app.post("/agents/:agentId/flows/:flowId/pages", async (req, res) => {
       {keyFilename: "./flowBuilder.json"}
   );
 
-  const email = req.body.credentials.email;
+  // const email = req.body.credentials.email; // use it when db integrated
 
   // Default flow ID, created automatically when a project is created
-  const flowID = '00000000-0000-0000-0000-000000000000';
+  const location = "general"; // change this with dynamic agent location
+  const flowID = req.params.flowId;
   const agentName = req.params.agentId;
 
   try {
-    // Get the agent id and location
-    const snapshot = await db.collection('users').doc(email)
-    .collection('agents').doc(agentName).get();
-
-    console.log(snapshot);
-    
-    // Tokenize the id element of the whole path, id will always be on 6th position
-    // ex: projects/flowbuilder-857d5/locations/global/agents/4276b117-7ebf-40bc-9264-cb376d64e0d5
-    const id = snapshot.get('id');
-    const location = snapshot.get('location');
-
-    const pagePath = client.flowPath(project, location, id, flowID);
+    const flowPath = client.flowPath(project, location, agentName, flowID);
 
     const newPage = req.body.page
       // displayName: 'AlejoPage',
@@ -134,21 +234,54 @@ app.post("/agents/:agentId/flows/:flowId/pages", async (req, res) => {
       // transitionRoutes
       // eventHandlers
 
-    const promisePage = await client.createPage({
-      parent: pagePath,
+    const result = await client.createPage({
+      parent: flowPath,
       page: newPage,
       // languageCode here
       // https://cloud.google.com/dialogflow/cx/docs/reference/language
     });
 
-    res.send(promisePage);
+    res.send(result);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+app.put("/agents/:agentId/flows/:flowId/pages/:pageId", async (req, res) => {
+  const client = new dialogflowcx.v3.PagesClient(
+      {keyFilename: "./flowBuilder.json"}
+  );
+
+  // const email = req.body.credentials.email; // use it when db integrated
+
+  // Default flow ID, created automatically when a project is created
+  const location = "general"; // change this with dynamic agent location
+  const flowId = req.params.flowId;
+  const agentName = req.params.agentId;
+  const pageId = req.params.pageId;
+  const {page: updatePage} = req.body;
+
+  try {
+    const pagePath = client.pagePath(project, location, agentName, flowId, pageId);
+
+    const [IPage] = await client.getPage({
+      name: pagePath,
+      // languageCode
+    });
+
+    const result = await client.updatePage({
+      page: IPage,
+      // languageCode
+    });
+
+    res.send(result);
   } catch (err) {
     res.status(500).send(err);
   }
 });
 
 // Swagger set up
-const options = {
+/*const options = {
   swaggerDefinition: {
     openapi: "3.0.0",
     info: {
@@ -168,7 +301,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:3000/api/v1"
+        url: "http://localhost:5001/flowbuilder-857d5/us-central1/app"
       }
     ]
   },
@@ -181,6 +314,6 @@ app.get(
   swaggerUi.setup(specs, {
     explorer: true
   })
-);
+);*/
 
 exports.app = functions.https.onRequest(app);
