@@ -64,3 +64,10 @@ node_modules/
 
 # dotenv environment variables file
 .env
+
+# service account
+flowBuilder.json
+
+webhook.controllers*
+
+intent*
