@@ -9,25 +9,14 @@ const client = new dialogflowcx.v3.PagesClient(
 export const create = async (
     req: express.Request, res: express.Response
 ): Promise<unknown> => {
-  // Default flow ID, created automatically when a project is created
-  // const {email} = req.body.credentials;
   let flowId = req.params.flowId;
   const agentId = req.params.agentId;
-
-  // Using default flowId for all pages
-  // change
   flowId = "00000000-0000-0000-0000-000000000000";
 
   try {
     const flowPath = client.flowPath(PROJECT, LOCATION, agentId, flowId);
 
     const newPage = new Df.Page(req.body.page);
-    // displayName: 'AlejoPage',
-    // entryFulfillment
-    // form
-    // transitionRouteGroups
-    // transitionRoutes
-    // eventHandlers
 
     const result = await client.createPage({
       parent: flowPath,
@@ -49,14 +38,11 @@ export const update = async (
       {keyFilename: "./flowBuilder.json"}
   );
 
-  // const email = req.body.credentials.email; // use it when db integrated
-
   // Default flow ID, created automatically when a project is created
   const location = "general"; // change this with dynamic agent location
   const flowId = req.params.flowId;
   const agentName = req.params.agentId;
   const pageId = req.params.pageId;
-  // const {page: updatePage} = req.body;
 
   try {
     const pagePath = client.pagePath(

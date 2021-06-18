@@ -20,14 +20,12 @@ export const create = async (
   reqAgent.parent = "projects/democx-303803";
 
   const newAgent = new Df.Agent(reqAgent);
-  console.log(newAgent);
   newAgent.displayName = newAgent.displayName + "." + email;
 
   const formattedAgentLocation = client.locationPath(
       PROJECT,
       LOCATION
   );
-  console.log(`Location path: ${formattedAgentLocation}`);
   try {
     const response = await client.createAgent({
       parent: formattedAgentLocation,
@@ -52,7 +50,6 @@ export const create = async (
       updatedAt: Date.now().toString(),
       userId: email,
     };
-    console.log(response[0]);
     await db.collection("agents").add(agent);
     return res.send(response);
   } catch (err) {

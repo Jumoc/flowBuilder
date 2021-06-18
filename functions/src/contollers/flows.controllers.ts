@@ -18,9 +18,10 @@ const createStart = async (question: any, agentId: string) => {
   const intentPath = intentsClient.intentPath(
       PROJECT, LOCATION, agentId, defaultIntent
   );
-  const pagePath = pagesClient.pagePath(
-      PROJECT, LOCATION, agentId, defaultIntent, "START_PAGE"
-  );
+  // Commented due to problems with Start Page
+  // const pagePath = pagesClient.pagePath(
+  //     PROJECT, LOCATION, agentId, defaultIntent, "START_PAGE"
+  // );
 
   // Create follow up page
   try {
@@ -47,8 +48,7 @@ const createStart = async (question: any, agentId: string) => {
         repeatCount: 1,
       },
     ];
-    console.log("entré al try");
-    console.log(pagePath);
+    // Commented due to problems with Start Page
     // const startPage = await pagesClient.getPage({name: pagePath});
     // console.log(startPage[0]);
 
@@ -58,6 +58,7 @@ const createStart = async (question: any, agentId: string) => {
     await intentsClient.updateIntent({
       intent: startIntent[0],
     });
+    // Commented due to problems with Start Page
     // await pagesClient.updatePage({
     //   page: startPage[0],
     // });
@@ -178,7 +179,6 @@ const createEnd = (
             PROJECT, LOCATION, agentId, defaultFlow, "END_SESSION"
         )}
   );
-
   return component;
 };
 
@@ -186,11 +186,8 @@ const linkComponent = async (component: Component, components: Component[]) => {
   const parentIntent = pagesClient.agentPath(PROJECT, LOCATION, agentId);
 
   const newIntents = [];
-  // create answers first
   if (component.type !== types.message && component.type !== types.end) {
     const intents = createIntents(component);
-    console.log('intents');
-    console.log(intents);
 
     try {
     for await (const intent of intents) {
@@ -214,15 +211,11 @@ const linkComponent = async (component: Component, components: Component[]) => {
   );
 
   component.cx.transitionRoutes = routes;
-  console.log("component with transitions");
-  console.log(component.cx);
 
   try {
-    const updatedPage = await pagesClient.updatePage({
+    await pagesClient.updatePage({
       page: component.cx,
     });
-    console.log("updated page");
-    console.log(updatedPage);
     return component;
   } catch (err) {
     return err;
@@ -244,7 +237,7 @@ export const create = async (
       const component = await createComponent(item);
       components.push(component);
     }
-    // link every page
+    // Link every page
     for await (const component of components) {
       await linkComponent(component, components);
     }
@@ -260,16 +253,9 @@ const createComponent = (item: any) => {
     switch (item.type) {
       case types.start:
         component = createStart(item, agentId);
-        console.log("entré start");
-
         break;
-      case types.question:
+      case types.question || types.message:
         component = createQuestion(item, agentId);
-        console.log("entré question");
-        break;
-      case types.message:
-        component = createQuestion(item, agentId);
-        console.log("entré message");
         break;
       case "end":
         component = createEnd(item, agentId);

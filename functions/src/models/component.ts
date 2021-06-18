@@ -7,10 +7,10 @@ export enum types {
 
 /** Constructor for an agent
      * @param {types} type - type of component
-     * @param {string} id - type of component
-     * @param {[]} answers - id of the user
-     * @param {[]} questions - location of the agent
-     * @param {any} cx - name of the agent
+     * @param {string} id - id of component
+     * @param {[]} answers - answers of component
+     * @param {[]} questions - questions
+     * @param {any} cx - CX element attached
 */
 interface IComponent {
     type: types
@@ -21,10 +21,10 @@ interface IComponent {
 }
 /** Constructor for an agent
      * @param {types} type - type of component
-     * @param {string} id - type of component
-     * @param {[]} answers - id of the user
-     * @param {[]} questions - location of the agent
-     * @param {any} cx - name of the agent
+     * @param {string} id - id of component
+     * @param {[]} answers - answers of component
+     * @param {[]} questions - questions
+     * @param {any} cx - CX element attached
 */
 export class Component implements IComponent {
     type: types;
@@ -35,10 +35,10 @@ export class Component implements IComponent {
 
     /** Constructor for an agent
      * @param {types} type - type of component
-     * @param {string} id - type of component
-     * @param {[]} answers - id of the user
-     * @param {[]} questions - location of the agent
-     * @param {any} cx - name of the agent
+     * @param {string} id - id of component
+     * @param {[]} answers - answers of component
+     * @param {[]} questions - questions
+     * @param {any} cx - CX element attached
 */
     constructor(type: types, id: string, answers: [], questions: [], cx: any) {
       this.type = type;
