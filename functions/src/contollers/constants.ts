@@ -3,7 +3,7 @@ import * as dialogflowcx from "@google-cloud/dialogflow-cx";
 
 admin.initializeApp();
 
-export const PROJECT = "flowbuilder-857d5";
+export const PROJECT = "democx-303803";
 export const db = admin.firestore();
 export const keyFilename = "";
 export const Df = dialogflowcx.protos.google.cloud.dialogflow.cx.v3;

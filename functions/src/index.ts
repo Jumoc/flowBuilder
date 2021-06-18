@@ -1,37 +1,17 @@
 import * as functions from "firebase-functions";
-
 import * as express from "express";
 import * as cors from "cors";
 import * as agents from "./contollers/agents.controllers";
 import * as flows from "./contollers/flows.controllers";
 import * as pages from "./contollers/pages.controllers";
+import * as intents from "./contollers/intents.controllers";
+import * as webhook from "./contollers/webhook.controllers";
 // import * as swaggerJsdoc from "swagger-jsdoc";
 // import * as swaggerUi from "swagger-ui-express";
 
 const app = express();
 app.use(express.json());
 app.use(cors());
-
-
-// app.get('/generate', async (req, res) => {
-//   await db.collection('users').doc('jumo').set({
-//     agents: db.collection
-//   });
-//   res.send('created')
-// });
-/*
-  body:
-    "agent": {
-      "parent": "parent path",
-      "displayName": "name of the agent",
-      "defaultLanguageCode": "en",
-      "timeZone": "America/Los_Angeles"
-      },
-    "location": "location of the agent",
-    "credentials": {
-        "email": "email that the agent is going to"
-    }
-*/
 
 // Agents
 app.post("/agents", agents.create);
@@ -40,14 +20,24 @@ app.delete("/agents/:agentId", agents.remove);
 
 // Flows
 app.post("/agents/:agentId/flows", flows.create);
-app.put("/agents/:agentId/flows/:flowId", flows.update);
-app.delete("/agents/:agentId/flows/:flowId", flows.remove);
+// app.put("/agents/:agentId/flows/:flowId", flows.update);
+// app.delete("/agents/:agentId/flows/:flowId", flows.remove);
 
 // Poges
 app.post("/agents/:agentId/flows/:flowId/pages", pages.create);
 app.put("/agents/:agentId/flows/:flowId/pages/:pageId", pages.update);
 
 // Intents
+app.post("/agents/:agentId/intents/", intents.create);
+
+// webhook
+app.post("/webhook", webhook.generateMessage);
+
+app.post("/eventWebook", webhook.eventWelcome);
+
+// app.put("/agents/:agentId/intents/:intentId", intents.create)
+// app.delete("/agents/:agentId/intents/:intentId", intents.create)
+
 
 // Swagger set up
 /* const options = {

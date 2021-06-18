@@ -13,20 +13,13 @@ const client = new dialogflowcx.v3.AgentsClient(
 export const create = async (
     req: express.Request, res: express.Response
 ): Promise<unknown> => {
-  // Gets email from body json
-  const email = req.body.credentials.email;
-  const displayName = req.body.agent.displayName;
 
-  if (displayName === "") {
-    return res.status(400).send(
-        {
-          error: `${displayName} can not be empty`,
-        });
-  }
+  const { email } = req.body.credentials;
+  const { agent: reqAgent } = req.body;
 
-  // Check if agent name is already in the database
+  reqAgent.parent = "projects/democx-303803";
 
-  const newAgent = new Df.Agent(req.body.agent);
+  const newAgent = new Df.Agent(reqAgent);
   console.log(newAgent);
   newAgent.displayName = newAgent.displayName + "." + email;
 
@@ -50,7 +43,7 @@ export const create = async (
             error: "Error while creating the agent",
           });
     }
-    // Agent that gets uploaded to firestore
+    
     const agent: IAgent = {
       agentId: newAgent.name,
       displayName: newAgent.displayName,
@@ -60,15 +53,7 @@ export const create = async (
       userId: email,
     };
     console.log(response[0]);
-    const document = await db.collection("agents").add(agent);
-    await document.collection("flows").add({
-      flowId: "00000000-0000-0000-0000-000000000000",
-      displayName: "default",
-    });
-    await document.collection("pages").add({
-      pageId: "START_PAGE",
-      displayName: "start",
-    });
+    await db.collection("agents").add(agent);
     return res.send(response);
   } catch (err) {
     console.error(err);
@@ -76,7 +61,7 @@ export const create = async (
   }
 };
 
-
+// Fix database query
 export const update = async (
     req: express.Request, res: express.Response
 ): Promise<unknown> => {
@@ -84,66 +69,29 @@ export const update = async (
       {keyFilename: "./flowBuilder.json"}
   );
 
-  // Gets email from credentials body json
   const {email} = req.body.credentials;
   const agentId = req.params.agentId;
-
-  if (agentId === "") {
-    return res.status(400).send(
-        {
-          error: `${agentId} can not be empty`,
-        });
-  }
-  // check if email exists in the db
-  // check if an agent with that name exists in the db
-
   const agentPath = client.agentPath(PROJECT, LOCATION, agentId);
 
   try {
-    const [IAgent] = await client.getAgent({
+    let [IAgent] = await client.getAgent({
       name: agentPath,
     });
 
-    if (!IAgent) {
-      return res.status(400).send(
-          {
-            error: "Error getting the agent, check the id",
-          });
-    }
-
-    const document = await db.collection("agents").where("userId", "==", email)
+    const document = await db.collection("agents")
         .where("agentId", "==", agentId).get();
 
-    if (!document.docs[0]) {
-      return res.status(400).send(
-          {
-            error: "Could not locate agent in the Database",
-          });
-    }
+    IAgent = Object.assign(IAgent, req.body);
 
-    Object.assign(IAgent, req.body.agent);
-
-    // update client with data passed to it
     const update = await client.updateAgent({
-      agent: IAgent, // agent to update
+      agent: IAgent,
     });
 
-    const formattedName = tokenAgentId(IAgent.name as string);
-
-    if (formattedName === null) {
-      console.error("Could not tokenize agent id " + IAgent.name);
-      return res.status(500).send(
-          {
-            error: "Could not tokenize agent id " + IAgent.name,
-          });
-    }
-
     const agent: IAgent = {
-      agentId: formattedName,
-      // add user email to the displayName if not present
+      agentId: document.docs[0].get("agentId"),
       displayName: IAgent.displayName as string,
       location: LOCATION,
-      createdAt: document.docs[0].data().updatedAt,
+      createdAt: document.docs[0].get("createdAt"),
       updatedAt: Date.now().toString(),
       userId: email,
     };
@@ -153,7 +101,7 @@ export const update = async (
     return res.send(update);
   } catch (err) {
     console.error(err);
-    return res.send(err);
+    return res.status(500).send(err);
   }
 };
 
@@ -162,46 +110,15 @@ export const remove = async (
 ): Promise<unknown> => {
   const agentId = req.params.agentId;
   const agentPath = client.agentPath(PROJECT, "global", agentId);
-  const {email} = req.body.credentials;
 
   try {
-    const [IAgent] = await client.getAgent({
-      name: agentPath,
-    });
-
-    if (!IAgent) {
-      return res.status(404).send(
-          {
-            error: `No agent with that id found ${agentId}`,
-          });
-    }
-
-    const document = await db.collection("agents").where("userId", "==", email)
+    const document = await db.collection("agents")
         .where("agentId", "==", agentId).get();
 
-    if (!document.docs[0]) {
-      return res.status(400).send(
-          {
-            error: "Could not locate agent in the Database",
-          });
-    }
-
-    /* Delete flows subcollection */
-    const snapshotFlows = await document.docs[0].ref.collection("flows").get();
-
-    snapshotFlows.docs.forEach((doc) => {
-      doc.ref.delete();
+    // Delete document
+    document.forEach(async (value) => {
+      await value.ref.delete();
     });
-
-    /* Delete pages subcollection */
-    const snapshotPages = await document.docs[0].ref.collection("pages").get();
-
-    snapshotPages.docs.forEach((doc) => {
-      doc.ref.delete();
-    });
-
-    /* Delete complete document */
-    await document.docs[0].ref.delete();
 
     const response = await client.deleteAgent({name: agentPath});
     return res.send(response);
@@ -209,18 +126,4 @@ export const remove = async (
     console.error(err);
     return res.status(400).send(err);
   }
-};
-
-const tokenAgentId = (path: string): string | null => {
-  if (!path.includes("/")) {
-    return path;
-  }
-
-  const tokens = path.split("/");
-
-  if (tokens.length < 6) {
-    return null;
-  }
-
-  return tokens[5];
 };
