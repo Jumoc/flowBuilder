@@ -15,7 +15,5 @@ app.delete("/agents/:agentId", agents.remove);
 
 // Flows
 app.post("/agents/:agentId/flows", flows.create);
-// app.put("/agents/:agentId/flows/:flowId", flows.update);
-// app.delete("/agents/:agentId/flows/:flowId", flows.remove);
 
 exports.app = functions.https.onRequest(app);
