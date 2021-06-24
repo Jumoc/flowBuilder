@@ -27,7 +27,6 @@ The process its really simple, just choose a name for your agent and start build
 ## Endpoints
 
 **Agents**
-----
   Manage your agents 
 
 * **URL**
