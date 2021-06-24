@@ -1,3 +1,5 @@
+import {answer, questions} from "./element";
+
 export enum types {
     start = "start",
     question = "question",
@@ -15,8 +17,8 @@ export enum types {
 interface IComponent {
     type: types
     id: string
-    answers: []
-    questions: []
+    answers: answer []
+    questions: questions
     cx: any
 }
 /** Constructor for an agent
@@ -29,8 +31,8 @@ interface IComponent {
 export class Component implements IComponent {
     type: types;
     id: string;
-    answers: [];
-    questions: [];
+    answers: answer[];
+    questions: questions;
     cx: any;
 
     /** Constructor for an agent
@@ -40,7 +42,13 @@ export class Component implements IComponent {
      * @param {[]} questions - questions
      * @param {any} cx - CX element attached
 */
-    constructor(type: types, id: string, answers: [], questions: [], cx: any) {
+    constructor(
+        type: types,
+        id: string,
+        answers: answer[],
+        questions: questions,
+        cx: any
+    ) {
       this.type = type;
       this.id = id;
       this.answers = answers;

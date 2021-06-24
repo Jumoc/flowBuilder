@@ -71,3 +71,7 @@ flowBuilder.json
 webhook.controllers*
 
 intent*
+
+.vscode
+
+json.json

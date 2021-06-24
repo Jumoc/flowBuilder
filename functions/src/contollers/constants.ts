@@ -1,6 +1,7 @@
 import * as admin from "firebase-admin";
 import * as dialogflowcx from "@google-cloud/dialogflow-cx";
 
+// Initialize firestore and create constants
 admin.initializeApp();
 
 export const PROJECT = "democx-303803";

@@ -1,31 +1,37 @@
 import * as dialogflowcx from "@google-cloud/dialogflow-cx";
-import {/* db,*/ PROJECT, LOCATION, Df} from "./constants";
+import {PROJECT, LOCATION, Df} from "./constants";
 import * as express from "express";
 import {Component, types} from "../models/component";
+import {answer, IElement} from "../models/element";
 
+// instance to manage Dialogflow CX Pages
 const pagesClient = new dialogflowcx.v3beta1.PagesClient(
     {keyFilename: "./flowBuilder.json"}
 );
 
+// instance to manage Dialogflow CX Intents
 const intentsClient = new dialogflowcx.v3.IntentsClient(
     {keyFilename: "./flowBuilder.json"}
 );
 
-// Updates the start page of dialogflow cx so first message doesn't matter
-const createStart = async (question: any, agentId: string) => {
+/**
+ * Creates a start Page in DF CX passing it a question
+ * @param {IElement} element
+ * @param {string} agentId
+ * @return {Component} component representing a DF CX Page and question
+ */
+const createStart = async (
+    element: IElement, agentId: string
+): Promise<Component> => {
   const defaultIntent = "00000000-0000-0000-0000-000000000000";
   const entityType = "projects/-/locations/-/agents/-/entityTypes/sys.any";
   const intentPath = intentsClient.intentPath(
       PROJECT, LOCATION, agentId, defaultIntent
   );
-  // Commented due to problems with Start Page
-  // const pagePath = pagesClient.pagePath(
-  //     PROJECT, LOCATION, agentId, defaultIntent, "START_PAGE"
-  // );
 
   // Create follow up page
   try {
-    const component = await createQuestion(question, agentId);
+    const component = await createQuestion(element, agentId);
 
     const startIntent = await intentsClient.getIntent({name: intentPath});
     startIntent[0].parameters = [
@@ -48,29 +54,23 @@ const createStart = async (question: any, agentId: string) => {
         repeatCount: 1,
       },
     ];
-    // Commented due to problems with Start Page
-    // const startPage = await pagesClient.getPage({name: pagePath});
-    // console.log(startPage[0]);
-
-    /* if (startPage[0] && startPage[0].transitionRoutes) {
-      startPage[0].transitionRoutes[0].targetPage = component.cx.name;
-    }*/
     await intentsClient.updateIntent({
       intent: startIntent[0],
     });
-    // Commented due to problems with Start Page
-    // await pagesClient.updatePage({
-    //   page: startPage[0],
-    // });
     return component;
   } catch (err) {
     return err;
   }
 };
 
-// Creates a full page with intents on dialogflow
+/**
+ * Creates a Page in DF CX given a question type
+ * @param {IElement} element
+ * @param {string} agentId
+ * @return {Component} component representing a CX Page and question
+ */
 const createQuestion = async (
-    question: any, agentId: string
+    element: IElement, agentId: string
 ): Promise<Component> => {
   const defaultFlow = "00000000-0000-0000-0000-000000000000";
   const parentPage = pagesClient.flowPath(
@@ -78,12 +78,12 @@ const createQuestion = async (
   );
 
   const page = new Df.Page({
-    displayName: `${question.type}.${question.id}`,
+    displayName: `${element.type}.${element.id}`,
     entryFulfillment: {
       messages: [
         {
           text: {
-            text: [question.questions.content],
+            text: [element.questions.content],
           },
         },
       ],
@@ -97,10 +97,10 @@ const createQuestion = async (
     });
 
     const component = new Component(
-        question.type,
-        question.id,
-        question.answers,
-        question.questions,
+        element.type,
+        element.id,
+        element.answers,
+        element.questions,
         newPage[0]
     );
     return component;
@@ -109,31 +109,41 @@ const createQuestion = async (
   }
 };
 
+/**
+ * Generates A DF CX Page trannsition routes given a component type
+ * @param {any[]} intents list of intents of the component
+ * @param {Component} component component to generate its transition routes
+ * @param {Component[]} components list of all components to get the
+ * component target
+ * @return {any[]} Object representing a Page transition routes
+ */
 const generateTransitionRoutes = (
     intents: any[], component: Component, components: Component[]
-) => {
-  // routes get duplicated
-  const routes: any[] = [];
+): any[] => {
+  const routes: {
+    intent?: string, condition?: string, targetPage: string
+  }[] = [];
 
   const defaultFlow = "00000000-0000-0000-0000-000000000000";
   const endSession = pagesClient.pagePath(
       PROJECT, LOCATION, agentId, defaultFlow, "END_SESSION");
 
-  const answers: any[] = component.answers;
+  const answers: answer[] = component.answers;
 
   if (component.type === types.question || component.type === types.start) {
     for (let i = 0; i < intents.length; i++) {
-      const found = components.find((element) => element.id === answers[i].target);
-        let route = {};
-        route = {
-          intent: intents[i].name,
-          // if no route for the page, link it with end session
-          targetPage: found ? found.cx.name : endSession,
-        };
-        routes.push(route);
+      const found = components.find(
+          (element) => element.id === answers[i].target
+      );
+      const route = {
+        intent: intents[i].name,
+        // if no route for the page, link it with end session
+        targetPage: found ? found.cx.name : endSession,
+      };
+      routes.push(route);
     }
   } else if (component.type === types.message) {
-    answers.forEach((value: any) => {
+    answers.forEach((value: answer) => {
       const found = components.find((element) => element.id === value.target);
       routes.push({
         condition: "true",
@@ -144,12 +154,16 @@ const generateTransitionRoutes = (
   return routes;
 };
 
-// Creates intents with the answers of the user
-const createIntents = (question: any) => {
+/**
+ * Creates instances of Intents from the question Answers locally
+ * @param {IElement} element
+ * @return {any[]} list of created Intents
+ */
+const createIntents = (element: IElement) => {
   const intents = [];
-  for (const answer of question.answers) {
+  for (const answer of element.answers) {
     const intent = new Df.Intent({
-      displayName: `${answer.phrase}.${question.id}`,
+      displayName: `${answer.phrase}.${element.id}`,
       trainingPhrases: [
         {
           parts: [
@@ -164,8 +178,15 @@ const createIntents = (question: any) => {
   return intents;
 };
 
+/**
+ * Creates an End component which is equivalent
+ * to the end session in DF CX
+ * @param {IElement} element
+ * @param {string} agentId
+ * @return {Component} end component
+ */
 const createEnd = (
-    element: any, agentId: string
+    element: IElement, agentId: string
 ) => {
   const defaultFlow = "00000000-0000-0000-0000-000000000000";
 
@@ -182,36 +203,46 @@ const createEnd = (
   return component;
 };
 
-const linkComponent = async (component: Component, components: Component[]) => {
+/**
+ * Links a Component with its target
+ * uploads the intents to DF CX and Updates the Page with its transition routes
+ * @param {Component} component component to link with its target
+ * @param {Component[]} components list of all components
+ * @return {Promise<Component>} updated component with its transition routes
+ */
+const linkComponent = async (
+    component: Component, components: Component[]
+): Promise<Component> => {
   const parentIntent = pagesClient.agentPath(PROJECT, LOCATION, agentId);
 
   const newIntents = [];
   if (component.type !== types.message && component.type !== types.end) {
     const intents = createIntents(component);
 
+    // Creates all intents (answers) of the component in DF CX
     try {
-    for await (const intent of intents) {
-      try {
-        const newIntent = await intentsClient.createIntent({
-          parent: parentIntent,
-          intent: intent.intent,
-        });
-        newIntents.push(newIntent[0]);
-      } catch (err) {
-        return err;
+      for await (const intent of intents) {
+        try {
+          const newIntent = await intentsClient.createIntent({
+            parent: parentIntent,
+            intent: intent.intent,
+          });
+          newIntents.push(newIntent[0]);
+        } catch (err) {
+          return err;
+        }
       }
-    }
     } catch (err) {
       return err;
     }
   }
-
   const routes = generateTransitionRoutes(
       newIntents, component, components
   );
 
   component.cx.transitionRoutes = routes;
 
+  // Update the page (component) with its corresponding transition routes
   try {
     await pagesClient.updatePage({
       page: component.cx,
@@ -224,7 +255,12 @@ const linkComponent = async (component: Component, components: Component[]) => {
 
 let agentId: string;
 
-// Creates the flow from the flowBuilder request
+/**
+ * Function controller for POST requests to flows endpoint
+ * @param {express.Request} req request
+ * @param {express.Response} res response
+ * @return {Promise<Component[]>} List of all created components
+ */
 export const create = async (
     req: express.Request, res: express.Response
 ): Promise<unknown> => {
@@ -233,11 +269,12 @@ export const create = async (
 
   try {
     const components: Component[] = [];
+    // Create all components from the request flow
     for await (const item of flow) {
       const component = await createComponent(item);
-      components.push(component);
+      components.push(component as Component);
     }
-    // Link every page
+    // Link all components after creating them
     for await (const component of components) {
       await linkComponent(component, components);
     }
@@ -247,18 +284,26 @@ export const create = async (
   }
 };
 
-const createComponent = (item: any) => {
+/**
+ * Determines the type of the element and creates it
+ * @param {IElement} element
+ * @return {Promise<Component>} created component
+ */
+const createComponent = async (
+    element: IElement
+): Promise<Component | null> => {
   try {
     let component;
-    switch (item.type) {
+    switch (element.type) {
       case types.start:
-        component = createStart(item, agentId);
+        component = await createStart(element, agentId);
         break;
-      case types.question || types.message:
-        component = createQuestion(item, agentId);
+      case types.question:
+      case types.message:
+        component = await createQuestion(element, agentId);
         break;
-      case "end":
-        component = createEnd(item, agentId);
+      case types.end:
+        component = createEnd(element, agentId);
         break;
       default:
         return null;
